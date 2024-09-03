@@ -1,0 +1,13 @@
+[package]
+name = "twitch-chat-game-controller"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yaml-rust = { version = "~0.8.1", package = "yaml-rust2" }
+rdev = "~0.5.3"
+twitch-irc = "5.0.1"
+tokio = "1.40.0"
+simple-logging = "2.0.2"
+log = "~0.4.22"
+# maybe: thiserror = "1.0.63"

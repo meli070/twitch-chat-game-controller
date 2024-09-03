@@ -1,0 +1,30 @@
+log_level: info
+channel: lanoiresakura # your Twitch channel
+control_keys:
+  exit: F4
+  pause: F2 # key to pause/resume
+actions:
+  jump:
+    key: Alt
+    time: 1000
+  flare:
+    key: C
+    time: 1000
+  roll:
+    key: End
+    time: 1000
+  look:
+    key: Num0
+    time: 2000
+  weapon:
+    key: Space
+    time: 1000
+  action:
+    key: ControlLeft
+    time: 1000
+  walk:
+    key: ShiftLeft
+    time: 5000
+  left:
+    key: LeftArrow
+    time: 2000
