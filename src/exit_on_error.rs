@@ -11,7 +11,7 @@ impl<T, E> ExitOnError<T> for Result<T, E> {
             result
         } else {
             error!("{}", info);
-            std::process::exit(1);
+            std::process::exit(1)
         }
     }
 }
@@ -22,7 +22,7 @@ impl<T> ExitOnError<T> for Option<T> {
             result
         } else {
             error!("{}", info);
-            std::process::exit(1);
+            std::process::exit(1)
         }
     }
 }

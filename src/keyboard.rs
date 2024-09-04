@@ -1,17 +1,40 @@
-use rdev::{Event, EventType, Key};
+use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Key listener for pause or exit key
-pub fn global_listener(event: Event) {
-    match event.event_type {
-        EventType::KeyPress(key) => {
-            println!("{:?}", key);
-            println!("{:?}", event.name);
+use log::warn;
+use rdev::{Event, EventType, Key};
+use yaml_rust::Yaml;
+
+use crate::exit_on_error::ExitOnError;
+
+static EXIT_REQUEST: AtomicBool = AtomicBool::new(false);
+static PAUSE: AtomicBool = AtomicBool::new(false);
+
+/// Create event listener for pause or exit key
+pub fn create_global_key_listener(config: &Yaml) -> impl Fn(Event) {
+    let exit_key = Key::parse(
+        config["control_keys"]["exit"]
+            .as_str()
+            .exit_on_error("Exit key not specified"),
+    )
+    .exit_on_error("Could not parse exit key!");
+    let pause_key = Key::parse(
+        config["control_keys"]["pause"]
+            .as_str()
+            .exit_on_error("Pause key not specified"),
+    )
+    .exit_on_error("Could not parse pause key!");
+    move |event| {
+        if let EventType::KeyPress(key) = &event.event_type {
+            if key == &exit_key {
+                let previous = EXIT_REQUEST.swap(true, Ordering::Relaxed);
+                if previous == true {
+                    warn!("Exit already requested, forcing exit...");
+                    std::process::exit(10);
+                }
+            } else if key == &pause_key {
+                PAUSE.fetch_xor(true, Ordering::Relaxed);
+            }
         }
-        EventType::ButtonPress(button) => {
-            println!("{:?}", button);
-            println!("{:?}", event.name);
-        }
-        _ => (),
     }
 }
 

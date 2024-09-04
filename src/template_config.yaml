@@ -1,7 +1,7 @@
 log_level: info
 channel: lanoiresakura # your Twitch channel
 control_keys:
-  exit: F4
+  exit: F4 # key to shut down the program
   pause: F2 # key to pause/resume
 actions:
   jump:

@@ -17,6 +17,7 @@ use yaml_rust::{self, Yaml};
 
 mod exit_on_error;
 mod keyboard;
+mod actions;
 
 static TEMPLATE_CONFIG: &str = include_str!("template_config.yaml");
 static CONFIG_PATH: &str = "config.yaml";
@@ -26,7 +27,7 @@ fn main() {
     info!("Twitch game controller started.");
     let config = load_or_create_config(CONFIG_PATH);
     set_log_level(&config).unwrap_or_else(|_| warn!("Problem setting log_level, ignoring..."));
-    rdev::listen(keyboard::global_listener)
+    rdev::listen(keyboard::create_global_key_listener(&config))
         .exit_on_error("Could not register global event listener callback");
     connect_and_poll_twitch(&config);
     info!("Program exit.");
