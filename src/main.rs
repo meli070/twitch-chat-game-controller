@@ -1,11 +1,10 @@
+use exit_on_error::ExitOnError;
+use log::{debug, error, info, warn, LevelFilter, ParseLevelError};
 use std::{
     fs::{self, read_to_string},
     path::Path,
-    str::FromStr,
+    str::FromStr, thread,
 };
-
-use exit_on_error::ExitOnError;
-use log::{error, info, warn, LevelFilter, ParseLevelError};
 use tokio::runtime::{self};
 use twitch_irc::{
     login::StaticLoginCredentials,
@@ -14,10 +13,9 @@ use twitch_irc::{
 };
 use yaml_rust::{self, Yaml};
 
-
+mod actions;
 mod exit_on_error;
 mod keyboard;
-mod actions;
 
 static TEMPLATE_CONFIG: &str = include_str!("template_config.yaml");
 static CONFIG_PATH: &str = "config.yaml";
@@ -27,8 +25,14 @@ fn main() {
     info!("Twitch game controller started.");
     let config = load_or_create_config(CONFIG_PATH);
     set_log_level(&config).unwrap_or_else(|_| warn!("Problem setting log_level, ignoring..."));
-    rdev::listen(keyboard::create_global_key_listener(&config))
-        .exit_on_error("Could not register global event listener callback");
+    debug!("Creating global key listener callback...");
+    let callback = keyboard::create_global_listener(&config);
+    debug!("Registering global key listener callback...");
+    thread::spawn(move || {
+        // This is bullshit: will block one CPU core!
+        rdev::listen(callback).exit_on_error("Could not register global event listener callback");
+    });
+    info!("Registered key listener.");
     connect_and_poll_twitch(&config);
     info!("Program exit.");
 }
@@ -44,39 +48,34 @@ fn connect_and_poll_twitch(config: &Yaml) {
         let (mut incoming_messages, client) =
             TwitchIRCClient::<SecureTCPTransport, StaticLoginCredentials>::new(client_config);
 
-        // first thing you should do: start consuming incoming messages,
-        // otherwise they will back up.
+        let mut message_handler = actions::ChatHandler::create(config);
+
+        // consuming incoming messages
         let join_handle = tokio::spawn(async move {
             while let Some(message) = incoming_messages.recv().await {
-                match message {
-                    ServerMessage::Privmsg(PrivmsgMessage {
-                        message_text,
-                        sender,
-                        ..
-                    }) => {
-                        println!("{}: {}", sender.name, message_text);
-                    }
-                    _ => (),
-                }
+                message_handler.handle(&message);
             }
         });
 
-        // join a channel
-        // This function only returns an error if the passed channel login name is malformed,
-        // so in this simple case where the channel name is hardcoded we can ignore the potential
-        // error with `unwrap`.
+        // join the channel
+        let channel = config["channel"]
+            .as_str()
+            .exit_on_error("Could not find channel to connect in config file!");
         client
-            .join(
-                config["channel"]
-                    .as_str()
-                    .exit_on_error("Could not find channel to connect in config file!")
-                    .to_owned(),
-            )
+            .join(channel.to_owned())
             .exit_on_error("Can not connect to Twitch channel!");
+        info!("Joined the Twitch channel: {channel}");
 
         // keep the tokio executor alive.
-        // If you return instead of waiting the background task will exit.
-        join_handle.await.unwrap();
+        let exit_signal = keyboard::get_exit_cancellation_token();
+        tokio::select! {
+            _ = exit_signal.cancelled() => {
+                info!("Received exit request, exiting...");
+            }
+            _ = join_handle => {
+                info!("Something went wrong listening to chat, exiting...");
+            }
+        }
     });
 }
 

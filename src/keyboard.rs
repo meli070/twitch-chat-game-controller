@@ -1,16 +1,23 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{cell::OnceCell, sync::{atomic::{AtomicBool, Ordering}, LazyLock, Mutex}};
 
-use log::warn;
+use log::{debug, info, warn};
 use rdev::{Event, EventType, Key};
+use tokio_util::sync::CancellationToken;
 use yaml_rust::Yaml;
 
 use crate::exit_on_error::ExitOnError;
 
+static EXIT_SIGNAL: LazyLock<CancellationToken> = LazyLock::new(|| CancellationToken::new());
 static EXIT_REQUEST: AtomicBool = AtomicBool::new(false);
 static PAUSE: AtomicBool = AtomicBool::new(false);
 
+
+pub fn get_exit_cancellation_token() -> CancellationToken {
+    EXIT_SIGNAL.clone()
+}
+
 /// Create event listener for pause or exit key
-pub fn create_global_key_listener(config: &Yaml) -> impl Fn(Event) {
+pub fn create_global_listener(config: &Yaml) -> impl FnMut(Event) + 'static {
     let exit_key = Key::parse(
         config["control_keys"]["exit"]
             .as_str()
@@ -23,15 +30,18 @@ pub fn create_global_key_listener(config: &Yaml) -> impl Fn(Event) {
             .exit_on_error("Pause key not specified"),
     )
     .exit_on_error("Could not parse pause key!");
+    debug!("Global keys parsed.");
     move |event| {
         if let EventType::KeyPress(key) = &event.event_type {
             if key == &exit_key {
+                info!("Requesting exit...");
                 let previous = EXIT_REQUEST.swap(true, Ordering::Relaxed);
+                EXIT_SIGNAL.cancel();
                 if previous == true {
                     warn!("Exit already requested, forcing exit...");
                     std::process::exit(10);
                 }
-            } else if key == &pause_key {
+            }else if key == &pause_key {
                 PAUSE.fetch_xor(true, Ordering::Relaxed);
             }
         }
@@ -167,6 +177,7 @@ impl ParseKey for Key {
         }
     }
 }
+
 
 #[cfg(test)]
 mod test {
