@@ -7,10 +7,7 @@ use std::{
     thread,
 };
 use tokio::runtime::{self};
-use twitch_irc::{
-    login::StaticLoginCredentials,
-    SecureTCPTransport, TwitchIRCClient,
-};
+use twitch_irc::{login::StaticLoginCredentials, SecureTCPTransport, TwitchIRCClient};
 use yaml_rust::{self, Yaml};
 
 mod actions;

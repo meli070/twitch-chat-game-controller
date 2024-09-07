@@ -1,7 +1,7 @@
 use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        LazyLock,
-    };
+    atomic::{AtomicBool, Ordering},
+    LazyLock,
+};
 
 use log::{debug, info, warn};
 use rdev::{Event, EventType, Key};
@@ -63,8 +63,8 @@ impl ParseKey for Key {
             "capslock" => Some(Key::CapsLock),
             "controlleft" | "control" | "ctrl" => Some(Key::ControlLeft),
             "controlright" => Some(Key::ControlRight),
-            "delete" => Some(Key::Delete),
-            "downarrow" => Some(Key::DownArrow),
+            "delete" | "del" => Some(Key::Delete),
+            "downarrow" | "down" => Some(Key::DownArrow),
             "end" => Some(Key::End),
             "escape" => Some(Key::Escape),
             "f1" => Some(Key::F1),

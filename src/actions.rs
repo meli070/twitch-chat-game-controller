@@ -1,6 +1,9 @@
 use std::{
-    collections::{BTreeMap, HashSet},
-    sync::{atomic::Ordering, Arc, Mutex},
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -23,14 +26,14 @@ enum Input {
 /// Creates an [Input] as an Result of a command specified in the config file
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct Action {
-    input: Input,
+    input: Vec<Input>,
     time_ms: Duration,
 }
 
 /// Handles chat messages and creates an [Action] if a command is recognized
 pub struct ChatHandler {
     command_to_action: BTreeMap<String, Action>,
-    executing_inputs: Arc<Mutex<HashSet<Input>>>,
+    execute_action: Arc<AtomicBool>,
 }
 
 impl ChatHandler {
@@ -56,23 +59,28 @@ impl ChatHandler {
                 100
             };
             let time = Duration::from_millis(time);
-            let key = Key::parse(
-                info["key"]
-                    .as_str()
-                    .exit_on_error(format!("Key in action {name} not found in config!").as_str()),
-            )
-            .exit_on_error(format!("Could not parse key for action {name}!").as_str());
+            let keys = info["key"]
+                .as_str()
+                .exit_on_error(format!("Key in action {name} not found in config!").as_str())
+                .split("+");
+            let keys: Vec<Input> = keys
+                .map(|key| {
+                    Key::parse(key)
+                        .exit_on_error(format!("Could not parse key for action {name}!").as_str())
+                })
+                .map(Input::Keyboard)
+                .collect();
             command_to_action.insert(
                 name.to_string(),
                 Action {
-                    input: Input::Keyboard(key),
+                    input: keys,
                     time_ms: time,
                 },
             );
         }
         Self {
             command_to_action,
-            executing_inputs: Arc::default(),
+            execute_action: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -81,42 +89,43 @@ impl ChatHandler {
             return;
         }
         if let ServerMessage::Privmsg(PrivmsgMessage {
-                message_text,
-                sender,
-                ..
-            }) = message {
+            message_text,
+            sender,
+            ..
+        }) = message
+        {
             println!("Twitch chat {}: {}", sender.name, message_text);
             let text = message_text.trim();
             if let Some(action) = self.command_to_action.get(text) {
-                let mut executing_inputs = self
-                    .executing_inputs
-                    .lock()
-                    .exit_on_error("Locking mutex failed!");
-                if executing_inputs.contains(&action.input) {
-                    debug!("Already executing {action:?}");
+                if self.execute_action.swap(true, Ordering::SeqCst) {
+                    debug!("Already executing action ignore {action:?}");
                     return;
                 }
                 debug!("Executing {action:?}...");
-                executing_inputs.insert(action.input.clone());
-                match action.input {
-                    Input::Keyboard(key) => {
-                        rdev::simulate(&EventType::KeyPress(key)).exit_on_error("Problem simulating key press!");
-                        let time = action.time_ms;
-                        let executing_inputs = self.executing_inputs.clone();
-                        tokio::spawn(async move {
-                            tokio::time::sleep(time).await;
-                            rdev::simulate(&EventType::KeyRelease(key))
-                                .exit_on_error("Problem simulating key release!");
-                            tokio::time::sleep(Duration::from_millis(20)).await;
-                            executing_inputs
-                                .lock()
-                                .exit_on_error(
-                                    "Could not lock mutex to remove executing input!",
-                                )
-                                .remove(&Input::Keyboard(key));
-                        });
-                    }
+                for input in &action.input {
+                    ChatHandler::handle_input(input, action.time_ms);
                 }
+                let time = action.time_ms;
+                let execute_action = self.execute_action.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(time).await;
+                    execute_action.store(false, Ordering::Release);
+                });
+            }
+        }
+    }
+
+    fn handle_input(input: &Input, time: Duration) {
+        match input {
+            Input::Keyboard(key) => {
+                rdev::simulate(&EventType::KeyPress(*key))
+                    .exit_on_error("Problem simulating key press!");
+                let key = *key;
+                tokio::spawn(async move {
+                    tokio::time::sleep(time).await;
+                    rdev::simulate(&EventType::KeyRelease(key))
+                        .exit_on_error("Problem simulating key release!");
+                });
             }
         }
     }
