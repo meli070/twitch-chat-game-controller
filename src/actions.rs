@@ -100,6 +100,7 @@ impl ChatHandler {
                 executing_inputs.insert(action.input.clone());
                 match action.input {
                     Input::Keyboard(key) => {
+                        rdev::simulate(&EventType::KeyPress(key)).exit_on_error("Problem simulating key press!");;
                         let time = action.time_ms;
                         let executing_inputs = self.executing_inputs.clone();
                         tokio::spawn(async move {
