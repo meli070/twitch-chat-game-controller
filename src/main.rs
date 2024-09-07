@@ -29,7 +29,7 @@ fn main() {
     let callback = keyboard::create_global_listener(&config);
     debug!("Registering global key listener callback...");
     thread::spawn(move || {
-        // This is bullshit: will block one CPU core!
+        // TODO: This is bullshit: will block one CPU core! Need to find a better library than rdev!
         rdev::listen(callback).exit_on_error("Could not register global event listener callback");
     });
     info!("Registered key listener.");
@@ -73,7 +73,7 @@ fn connect_and_poll_twitch(config: &Yaml) {
                 info!("Received exit request, exiting...");
             }
             _ = join_handle => {
-                info!("Something went wrong listening to chat, exiting...");
+                warn!("Something went wrong listening to chat, exiting...");
             }
         }
     });

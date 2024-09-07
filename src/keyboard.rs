@@ -9,7 +9,7 @@ use crate::exit_on_error::ExitOnError;
 
 static EXIT_SIGNAL: LazyLock<CancellationToken> = LazyLock::new(|| CancellationToken::new());
 static EXIT_REQUEST: AtomicBool = AtomicBool::new(false);
-static PAUSE: AtomicBool = AtomicBool::new(false);
+pub static PAUSE: AtomicBool = AtomicBool::new(false);
 
 
 pub fn get_exit_cancellation_token() -> CancellationToken {
