@@ -1,4 +1,7 @@
-use std::{cell::OnceCell, sync::{atomic::{AtomicBool, Ordering}, LazyLock, Mutex}};
+use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        LazyLock,
+    };
 
 use log::{debug, info, warn};
 use rdev::{Event, EventType, Key};
@@ -7,10 +10,9 @@ use yaml_rust::Yaml;
 
 use crate::exit_on_error::ExitOnError;
 
-static EXIT_SIGNAL: LazyLock<CancellationToken> = LazyLock::new(|| CancellationToken::new());
+static EXIT_SIGNAL: LazyLock<CancellationToken> = LazyLock::new(CancellationToken::new);
 static EXIT_REQUEST: AtomicBool = AtomicBool::new(false);
 pub static PAUSE: AtomicBool = AtomicBool::new(false);
-
 
 pub fn get_exit_cancellation_token() -> CancellationToken {
     EXIT_SIGNAL.clone()
@@ -37,11 +39,11 @@ pub fn create_global_listener(config: &Yaml) -> impl FnMut(Event) + 'static {
                 info!("Requesting exit...");
                 let previous = EXIT_REQUEST.swap(true, Ordering::Relaxed);
                 EXIT_SIGNAL.cancel();
-                if previous == true {
+                if previous {
                     warn!("Exit already requested, forcing exit...");
                     std::process::exit(10);
                 }
-            }else if key == &pause_key {
+            } else if key == &pause_key {
                 PAUSE.fetch_xor(true, Ordering::Relaxed);
             }
         }
@@ -56,7 +58,7 @@ impl ParseKey for Key {
     fn parse(s: &str) -> Option<Key> {
         match s.to_lowercase().as_str() {
             "alt" => Some(Key::Alt),
-            "altGr" => Some(Key::AltGr),
+            "altgr" => Some(Key::AltGr),
             "backspace" => Some(Key::Backspace),
             "capslock" => Some(Key::CapsLock),
             "controlleft" | "control" | "ctrl" => Some(Key::ControlLeft),
@@ -177,7 +179,6 @@ impl ParseKey for Key {
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {

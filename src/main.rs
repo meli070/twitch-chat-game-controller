@@ -3,12 +3,12 @@ use log::{debug, error, info, warn, LevelFilter, ParseLevelError};
 use std::{
     fs::{self, read_to_string},
     path::Path,
-    str::FromStr, thread,
+    str::FromStr,
+    thread,
 };
 use tokio::runtime::{self};
 use twitch_irc::{
     login::StaticLoginCredentials,
-    message::{PrivmsgMessage, ServerMessage},
     SecureTCPTransport, TwitchIRCClient,
 };
 use yaml_rust::{self, Yaml};
